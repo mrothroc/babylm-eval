@@ -51,6 +51,7 @@ def _parse_arguments() -> argparse.Namespace:
     parser.add_argument("--encoder_lr", default=None, type=float, help="Learning rate for the encoder during joint fine-tuning. Defaults to learning_rate.")
     parser.add_argument("--audit_log", action="store_true", default=True, help="Write per-epoch audit JSONL and summary JSON files.")
     parser.add_argument("--classifier_dropout", default=0.1, type=float, help="The dropout applied to the classifier head. (Needs to be a value between 0 and 1)")
+    parser.add_argument("--classifier_simple_head", action="store_true", default=False, help="Replace the MLP+GELU classifier head with a simple LayerNorm+Dropout+Linear head.")
     parser.add_argument("--classifier_layer_norm_eps", default=1.0e-5, type=float, help="The epsilon to add to the layer norm operations to stabalize the division and avoid dividing by zero.")
     parser.add_argument("--weight_decay", default=0.01, type=float, help="The weight decay to apply for the optimizer (if a weight decay is relevant). (Needs to be a value between 0 and 1)")
     parser.add_argument("--warmup_proportion", default=0.06, type=float, help="The proportion of the fine-tuning steps where the learning rate increases from 0 to its maximum value. (Needs to be a value between 0 and 1)")

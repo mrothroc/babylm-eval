@@ -28,14 +28,21 @@ class ClassifierHead(nn.Module):
         """
         super().__init__()
         hidden_size: int = hidden_size if hidden_size is not None else config.hidden_size
-        self.nonlinearity = nn.Sequential(
-            nn.LayerNorm(hidden_size, config.classifier_layer_norm_eps, elementwise_affine=False),
-            nn.Linear(hidden_size, hidden_size),
-            nn.GELU(),
-            nn.LayerNorm(hidden_size, config.classifier_layer_norm_eps, elementwise_affine=False),
-            nn.Dropout(config.classifier_dropout),
-            nn.Linear(hidden_size, config.num_labels)
-        )
+        if getattr(config, "classifier_simple_head", False):
+            self.nonlinearity = nn.Sequential(
+                nn.LayerNorm(hidden_size, config.classifier_layer_norm_eps, elementwise_affine=False),
+                nn.Dropout(config.classifier_dropout),
+                nn.Linear(hidden_size, config.num_labels),
+            )
+        else:
+            self.nonlinearity = nn.Sequential(
+                nn.LayerNorm(hidden_size, config.classifier_layer_norm_eps, elementwise_affine=False),
+                nn.Linear(hidden_size, hidden_size),
+                nn.GELU(),
+                nn.LayerNorm(hidden_size, config.classifier_layer_norm_eps, elementwise_affine=False),
+                nn.Dropout(config.classifier_dropout),
+                nn.Linear(hidden_size, config.num_labels)
+            )
 
     def forward(self: ClassifierHead, encodings: torch.Tensor) -> torch.Tensor:
         """This function handles the forward call of the
