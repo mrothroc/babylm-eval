@@ -45,6 +45,11 @@ def _parse_arguments() -> argparse.Namespace:
     parser.add_argument("--learning_rate", default=3e-5, type=float, help="The maximum learning rate during fine-tuning.")
     parser.add_argument("--sequence_length", default=512, type=int, help="The max sequence length before truncation.")
     parser.add_argument("--num_epochs", default=10, type=int, help="Number of epochs to fine-tune the code for.")
+    parser.add_argument("--head_only_epochs", default=0, type=int, help="Epochs with encoder frozen and only the classifier head trained.")
+    parser.add_argument("--head_lr", default=None, type=float, help="Learning rate for the classifier head. Defaults to learning_rate.")
+    parser.add_argument("--joint_epochs", default=None, type=int, help="Epochs with encoder unfrozen. Defaults to num_epochs when head_only_epochs is 0, otherwise 0.")
+    parser.add_argument("--encoder_lr", default=None, type=float, help="Learning rate for the encoder during joint fine-tuning. Defaults to learning_rate.")
+    parser.add_argument("--audit_log", action="store_true", default=True, help="Write per-epoch audit JSONL and summary JSON files.")
     parser.add_argument("--classifier_dropout", default=0.1, type=float, help="The dropout applied to the classifier head. (Needs to be a value between 0 and 1)")
     parser.add_argument("--classifier_layer_norm_eps", default=1.0e-5, type=float, help="The epsilon to add to the layer norm operations to stabalize the division and avoid dividing by zero.")
     parser.add_argument("--weight_decay", default=0.01, type=float, help="The weight decay to apply for the optimizer (if a weight decay is relevant). (Needs to be a value between 0 and 1)")
@@ -69,6 +74,10 @@ def _parse_arguments() -> argparse.Namespace:
 
     args = parser.parse_args()
     args.model_name = pathlib.Path(args.model_name_or_path).stem
+    args.head_lr = args.learning_rate if args.head_lr is None else args.head_lr
+    args.encoder_lr = args.learning_rate if args.encoder_lr is None else args.encoder_lr
+    if args.joint_epochs is None:
+        args.joint_epochs = args.num_epochs if args.head_only_epochs == 0 else 0
 
     if args.take_final and args.padding_side != "left":
         parser.error("--take_final requires --padding_side=left; pooling the last position with right-padding would select a pad token.")
@@ -96,6 +105,7 @@ if __name__ == "__main__":
     else:
         revision_name = args.revision_name
     output_path: pathlib.Path = args.results_dir / model_name / revision_name / "finetune" / args.task
+    args.output_path = output_path
     output_path.mkdir(parents=True, exist_ok=True)
     if args.save:
         args.save_path: pathlib.Path = args.save_dir / model_name / args.task
