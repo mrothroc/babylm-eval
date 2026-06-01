@@ -39,6 +39,7 @@ def _parse_arguments():
     parser.add_argument("--non_causal_batch_size", default=64, type=int, help="Mini-batch size to process each batch of inputs involving masked tokens")
     parser.add_argument("--full_sentence_scores", action="store_true", help="Whether to use the entire sentence to calculate the sentence scores rather than just the completion. (Only implemented for EWoK)")
     parser.add_argument("--save_predictions", action="store_true", help="Whether or not to save predictions.")
+    parser.add_argument("--save_raw_scores", action="store_true", help="Whether to dump raw per-option sum log-probs and phrase lengths to raw_scores.jsonl alongside predictions (causal backend only).")
 
     return parser.parse_args()
 

@@ -90,6 +90,9 @@ def compute_causal_results(args, model, dataloader, temperatures):
     if args.images_path is None:
         no_image = True
 
+    save_raw = getattr(args, "save_raw_scores", False)
+    raw_scores_rows = []
+
     for raw_sentences, sentence_dict, labels, metadatas, uids, images in tqdm(dataloader):
         update_subset_to_stats(subset_to_stats, metadatas)
         num_sentences = len([key for key in sentence_dict.keys() if key.endswith("attn_mask")])
@@ -97,6 +100,7 @@ def compute_causal_results(args, model, dataloader, temperatures):
 
         # Inference
         all_log_probs = {temp : [] for temp in subset_to_stats}
+        per_prefix_phrase_lengths = []
         for prefix in prefixes:
             if no_image:
                 logits = model(
@@ -123,7 +127,26 @@ def compute_causal_results(args, model, dataloader, temperatures):
                 phrase_log_probs = torch.sum(target_log_probs * sentence_dict[f"{prefix}_phrase_mask"].to(DEVICE), dim=1)
                 all_log_probs[temp].append(phrase_log_probs.cpu())
 
+            if save_raw:
+                phrase_len = sentence_dict[f"{prefix}_phrase_mask"].sum(dim=1).long().cpu()
+                per_prefix_phrase_lengths.append(phrase_len)
+
         rank_and_evaluate(args, subset_to_stats, all_log_probs, raw_sentences, labels, metadatas, uids, predictions)
+
+        if save_raw:
+            # Per-batch: stack along option dim, save one row per (temp, example)
+            stacked_lengths = torch.stack(per_prefix_phrase_lengths, dim=1)  # (B, num_options)
+            for temp in subset_to_stats:
+                stacked = torch.stack(all_log_probs[temp], dim=1)  # (B, num_options)
+                for i, uid in enumerate(uids):
+                    raw_scores_rows.append({
+                        "temp": float(temp),
+                        "uid": uid,
+                        "label": int(labels[i].item()) if hasattr(labels[i], "item") else int(labels[i]),
+                        "completions": raw_sentences[i]["completions"],
+                        "sum_log_probs": stacked[i].tolist(),
+                        "phrase_lengths": stacked_lengths[i].tolist(),
+                    })
 
     if args.save_predictions:
         for i in temperatures:
@@ -132,6 +155,15 @@ def compute_causal_results(args, model, dataloader, temperatures):
                 temp_pred[k] = dict()
                 temp_pred[k]["predictions"] = v
             final_predictions[i] = temp_pred
+
+    if save_raw:
+        import json as _json
+        import pathlib as _pathlib
+        raw_path = _pathlib.Path(args.output_path) / "raw_scores.jsonl"
+        with raw_path.open("w") as f:
+            for row in raw_scores_rows:
+                f.write(_json.dumps(row) + "\n")
+        print(f"[save_raw_scores] wrote {len(raw_scores_rows)} rows to {raw_path}")
 
     return subset_to_stats, final_predictions
 
